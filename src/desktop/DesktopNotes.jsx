@@ -24,7 +24,7 @@ import {
 import './noteVault.css';
 
 export function DesktopNotes({ notes, commit, searchNote }) {
-  const { session, update, publish, storageWarning } = useNoteDrafts();
+  const { session, update, publish } = useNoteDrafts();
   const [query, setQuery] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -337,10 +337,8 @@ export function DesktopNotes({ notes, commit, searchNote }) {
                   {stale
                     ? 'Another version was saved.'
                     : draft
-                      ? storageWarning
-                        ? 'Draft in memory. Save before closing.'
-                        : 'Draft saved in this tab'
-                      : 'Saved'}
+                      ? 'Unsaved draft'
+                      : 'Saved for this visit'}
                 </div>
                 {(warning || stale) && (
                   <div role="alert" className="vault-warning">

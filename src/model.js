@@ -1,5 +1,3 @@
-export const emptyWorkspace = { version: 1, tasks: [], notes: [], goals: [] };
-
 export const priorities = { low: 'Low', med: 'Medium', high: 'High' };
 export const statuses = {
   todo: 'To do',
@@ -105,44 +103,6 @@ export function removeGoal(workspace, id) {
 export function goalProgress(tasks, goalId) {
   const linked = tasks.filter((task) => task.goalId === goalId);
   return { total: linked.length, done: linked.filter((task) => task.status === 'done').length };
-}
-
-function hasStrings(value, keys) {
-  return value !== null && typeof value === 'object' && keys.every((key) => typeof value[key] === 'string');
-}
-
-function isTask(value) {
-  if (!hasStrings(value, ['id', 'taskName', 'description', 'dueDate', 'dueTime', 'status', 'priority', 'goalId']))
-    return false;
-  const { tags } = value;
-  return (
-    Object.hasOwn(statuses, value.status) &&
-    Object.hasOwn(priorities, value.priority) &&
-    Array.isArray(tags) &&
-    tags.every((tag) => typeof tag === 'string') &&
-    !taskError(value)
-  );
-}
-
-function isNote(value) {
-  return hasStrings(value, ['id', 'title', 'content']) && Number.isFinite(value.updatedAt);
-}
-
-export function decodeWorkspace(raw) {
-  if (raw === null) return emptyWorkspace;
-  const data = JSON.parse(raw);
-  if (
-    data?.version !== 1 ||
-    !Array.isArray(data.tasks) ||
-    !data.tasks.every(isTask) ||
-    !Array.isArray(data.notes) ||
-    !data.notes.every(isNote) ||
-    !Array.isArray(data.goals) ||
-    !data.goals.every((goal) => hasStrings(goal, ['id', 'title', 'description']))
-  ) {
-    throw new Error('Unsupported study workspace');
-  }
-  return { version: 1, tasks: data.tasks, notes: data.notes, goals: data.goals };
 }
 
 export function studyBrief(tasks, today) {

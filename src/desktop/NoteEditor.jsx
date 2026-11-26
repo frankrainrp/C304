@@ -8,25 +8,6 @@ import { EditorView, keymap, placeholder } from '@codemirror/view';
 import { wikiSyntax } from './noteVault.js';
 
 const positions = new Map();
-const positionKey = (id) => 'bito-c304.note-editor.position.' + id;
-
-function loadPosition(id) {
-  const cached = positions.get(id);
-  if (cached) return cached;
-  try {
-    const value = JSON.parse(sessionStorage.getItem(positionKey(id)) ?? 'null');
-    if (
-      value &&
-      Number.isSafeInteger(value.anchor) &&
-      Number.isSafeInteger(value.head) &&
-      Number.isFinite(value.top) &&
-      value.top >= 0
-    )
-      return value;
-  } catch {
-    /* The editor remains usable if browser storage is unavailable. */
-  }
-}
 
 const parentUpdate = Annotation.define();
 
@@ -38,7 +19,7 @@ export function MarkdownEditor({ noteId, value, titles, viewport, onChange, onPu
   props.current = { value, titles, onChange, onPublish, onWiki };
 
   useLayoutEffect(() => {
-    const saved = loadPosition(noteId);
+    const saved = positions.get(noteId);
     const documentPane = host.current.closest('.vault-document');
     const doc = Text.of(props.current.value.split(/\r\n?|\n/));
     const clamp = (offset) => Math.max(0, Math.min(offset, doc.length));
@@ -173,28 +154,11 @@ export function MarkdownEditor({ noteId, value, titles, viewport, onChange, onPu
     const remember = () => {
       const { anchor, head } = view.state.selection.main;
       captureView();
-      const position = { anchor, head, top, mark };
-      positions.set(noteId, position);
-      try {
-        sessionStorage.setItem(positionKey(noteId), JSON.stringify(position));
-      } catch {
-        /* In-tab navigation can restore the in-memory copy. */
-      }
-    };
-    // The editor can unmount after its outer scroll pane is detached. Track
-    // the last scroll event and persist only when leaving the tab or document.
-    const onLeave = () => {
-      publish();
-      remember();
-    };
-    const onHidden = () => {
-      if (document.visibilityState === 'hidden') onLeave();
+      positions.set(noteId, { anchor, head, top, mark });
     };
     documentPane.addEventListener('scroll', onScroll, { passive: true });
     const interruption = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
     for (const event of interruption) documentPane.addEventListener(event, stopRestore, { passive: true });
-    document.addEventListener('visibilitychange', onHidden);
-    window.addEventListener('pagehide', onLeave);
     return () => {
       view.contentDOM.removeEventListener('compositionstart', startComposition, true);
       view.contentDOM.removeEventListener('compositionend', endComposition, true);
@@ -206,8 +170,6 @@ export function MarkdownEditor({ noteId, value, titles, viewport, onChange, onPu
       cancelAnimationFrame(captureFrame);
       for (const event of interruption) documentPane.removeEventListener(event, stopRestore);
       documentPane.removeEventListener('scroll', onScroll);
-      document.removeEventListener('visibilitychange', onHidden);
-      window.removeEventListener('pagehide', onLeave);
       remember();
       editor.current = null;
       view.destroy();

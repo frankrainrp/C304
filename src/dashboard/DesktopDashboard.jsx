@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Button, SourceButton, colors, s } from '../ui.jsx';
 import { BitoText } from '../bito/Typography.jsx';
 import { DetroitTitle } from '../bito/Title.jsx';
@@ -140,41 +140,16 @@ function CardForm({ card, busy, save, cancel }) {
 }
 
 export function DesktopDashboard({ workspace, today }) {
-  const [layout, setLayout] = useState();
+  const layout = useSyncExternalStore(subscribeDashboard, getDashboardLayout);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState();
   const [busy, setBusy] = useState(false);
-  const [reload, setReload] = useState(0);
   const [status, setStatus] = useState('');
   const grid = useRef(null);
   const previous = useRef(new Map());
   const opener = useRef(null);
   const working = useRef(false);
-  useEffect(() => {
-    let active = true;
-    let latest = 0;
-    function refresh() {
-      const request = ++latest;
-      getDashboardLayout()
-        .then((next) => {
-          if (active && request === latest) {
-            setLayout(next);
-            setError('');
-          }
-        })
-        .catch((cause) => {
-          if (active && request === latest)
-            setError(cause instanceof Error ? cause.message : 'Could not open the dashboard.');
-        });
-    }
-    const unsubscribe = subscribeDashboard(refresh);
-    refresh();
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, [reload]);
   useLayoutEffect(() => {
     const next = new Map();
     for (const el of grid.current?.querySelectorAll('article[data-id]') ?? []) {
@@ -206,7 +181,7 @@ export function DesktopDashboard({ workspace, today }) {
     setStatus('');
     try {
       await applyDashboardAction(action);
-      setStatus('Dashboard saved.');
+      setStatus('Dashboard updated for this visit.');
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save the dashboard. Please try again.');
@@ -224,14 +199,14 @@ export function DesktopDashboard({ workspace, today }) {
     setForm(undefined);
     requestAnimationFrame(() => opener.current?.focus());
   }
-  const selection = layout?.modules.find((m) => m.id === form);
+  const selection = layout.modules.find((m) => m.id === form);
   return (
     <main className="butler-dashboard" aria-label="Dashboard workspace">
       <header className="dashboard-heading">
         <DetroitTitle title="Dashboard" />
         <div className="dashboard-top-actions">
           {editing && (
-            <Button label="Add card" icon="add" onPress={() => openForm('new')} disabled={busy || !layout} />
+            <Button label="Add card" icon="add" onPress={() => openForm('new')} disabled={busy} />
           )}
           <SourceButton
             accessibilityRole="button"
@@ -240,7 +215,7 @@ export function DesktopDashboard({ workspace, today }) {
               setForm(undefined);
               setEditing(!editing);
             }}
-            disabled={busy || !layout}
+            disabled={busy}
             style={s.button}
           >
             {(dark) => (
@@ -252,20 +227,14 @@ export function DesktopDashboard({ workspace, today }) {
           </SourceButton>
         </div>
       </header>
-      {error && (
-        <div role="alert" className="dashboard-error">
-          {error}{' '}
-          {!layout && <DetroitFormButton onClick={() => setReload((n) => n + 1)}>Try again</DetroitFormButton>}
-        </div>
-      )}
+      {error && <div role="alert" className="dashboard-error">{error}</div>}
       <div className="dashboard-sr" role="status" aria-live="polite">
         {status}
       </div>
       {editing && (form === 'new' || selection) && (
         <CardForm key={form} card={selection} busy={busy} save={save} cancel={closeForm} />
       )}
-      {!layout && !error && <p>Opening dashboard…</p>}
-      {layout && !layout.modules.length && (
+      {!layout.modules.length && (
         <p className="dashboard-empty">
           {editing
             ? 'Add a card to build your dashboard.'
@@ -273,7 +242,7 @@ export function DesktopDashboard({ workspace, today }) {
         </p>
       )}
       <div className="dashboard-grid" ref={grid}>
-        {layout?.modules.map((card, index) => (
+        {layout.modules.map((card, index) => (
           <article key={card.id} data-id={card.id} data-span={card.span} aria-label={card.title}>
             <h2>{card.title}</h2>
             <DashboardContent card={card} workspace={workspace} today={today} />

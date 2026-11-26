@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  blankTask, dateKey, dateFromKey, decodeWorkspace, emptyWorkspace, goalProgress,
+  blankTask, dateKey, dateFromKey, goalProgress,
   monthDays, moveMonth, removeGoal, sortTasks, summarizeTasks, taskError, validDate,
 } from '../src/model.js';
 
@@ -44,34 +44,24 @@ test('due tasks sort before unscheduled work, with time before priority', () => 
   assert.equal(tasks[0].id, 'late');
 });
 
-test('completion survives serialization and deleting a goal keeps linked tasks', () => {
+test('deleting a goal unlinks its tasks and preserves their completion state', () => {
   const completed = {
     ...blankTask('task', '2026-11-23', 'goal'),
     taskName: 'Review SQL',
     status: 'done',
   };
   const workspace = {
-    ...emptyWorkspace,
+    version: 1,
+    notes: [],
     goals: [{ id: 'goal', title: 'Prepare for quiz', description: '' }],
     tasks: [completed],
   };
-  const restored = decodeWorkspace(JSON.stringify(workspace));
-  assert.deepEqual(restored, workspace);
-  assert.deepEqual(goalProgress(restored.tasks, 'goal'), { done: 1, total: 1 });
-  assert.deepEqual(removeGoal(restored, 'goal'), {
-    ...emptyWorkspace,
+  assert.deepEqual(goalProgress(workspace.tasks, 'goal'), { done: 1, total: 1 });
+  assert.deepEqual(removeGoal(workspace, 'goal'), {
+    ...workspace,
+    goals: [],
     tasks: [{ ...completed, goalId: '' }],
   });
-});
-
-test('malformed and unsupported storage cannot become an empty workspace silently', () => {
-  assert.deepEqual(decodeWorkspace(null), emptyWorkspace);
-  assert.throws(() => decodeWorkspace('invalid JSON'));
-  assert.throws(() => decodeWorkspace(JSON.stringify({ ...emptyWorkspace, version: 2 })));
-  assert.throws(() => decodeWorkspace(JSON.stringify({
-    ...emptyWorkspace,
-    tasks: [{ ...blankTask('task', ''), taskName: 'Read', priority: 'toString' }],
-  })));
 });
 
 test('overall summary includes existing completed, scheduled and undated tasks regardless of list filters', () => {

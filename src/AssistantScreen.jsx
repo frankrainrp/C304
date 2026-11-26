@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   BackHandler,
   KeyboardAvoidingView,
   Platform,
@@ -46,9 +45,9 @@ function Connection({ assistant, onClose, onUse, onBusy }) {
   const retainedKey =
     assistant.model?.hasKey && provider === assistant.model.provider && baseUrl.trim() === assistant.model.baseUrl;
   const checksKey = provider !== 'butler' && Boolean(key.trim() || retainedKey);
-  const savedAccount = provider === assistant.model?.provider && baseUrl.trim() === assistant.model.baseUrl;
-  const showModels = savedAccount && !replaceKey && !customModel;
-  const savedProvider = assistant.model
+  const currentAccount = provider === assistant.model?.provider && baseUrl.trim() === assistant.model.baseUrl;
+  const showModels = currentAccount && !replaceKey && !customModel;
+  const currentProvider = assistant.model
     ? modelProviders.find(({ value }) => value === assistant.model?.provider)?.label
     : assistant.endpoint
       ? butlerOption.label
@@ -56,19 +55,17 @@ function Connection({ assistant, onClose, onUse, onBusy }) {
   const providerLabel =
     provider === 'butler' ? butlerOption.label : modelProviders.find(({ value }) => value === provider)?.label;
   const status =
-    assistant.connectionStatus === 'error'
-      ? 'Couldn’t open the saved connection.'
-      : !assistant.connected
-        ? 'No model connection saved.'
-        : assistant.replying
-          ? 'Checking the saved connection…'
-          : assistant.verification === 'verified'
-            ? 'The saved connection replied successfully.'
-            : assistant.verification === 'failed'
-              ? 'The last request failed. Check the chat error or update this connection.'
-              : assistant.catalogVerified
-                ? 'Provider catalogue loaded. Choose a model for your next message.'
-                : 'Connection saved. Send a message to verify it.';
+    !assistant.connected
+      ? 'No model connected.'
+      : assistant.replying
+        ? 'Waiting for a reply…'
+        : assistant.verification === 'verified'
+          ? 'The connection replied successfully.'
+          : assistant.verification === 'failed'
+            ? 'The last request failed. Check the chat error or update this connection.'
+            : assistant.catalogVerified
+              ? 'Provider catalogue loaded. Choose a model for your next message.'
+              : 'Connected for this visit. Send a message to verify the connection.';
   const active = useRef(true);
   const openedCatalog = useRef(false);
   useEffect(() => {
@@ -137,8 +134,8 @@ function Connection({ assistant, onClose, onUse, onBusy }) {
               <Text accessibilityLiveRegion="polite" style={s.subtitle}>
                 {operation === 'verify'
                   ? 'Checking your API key…'
-                  : savedProvider && savedProvider !== providerLabel
-                    ? `${savedProvider}: ${status}`
+                  : currentProvider && currentProvider !== providerLabel
+                    ? `${currentProvider}: ${status}`
                     : status}
               </Text>
             </View>
@@ -239,7 +236,7 @@ function Connection({ assistant, onClose, onUse, onBusy }) {
                   }
                 />
               )}
-              {(!savedAccount || replaceKey) &&
+              {(!currentAccount || replaceKey) &&
                 (assistant.allowsKeys ? (
                   <Field
                     label="API key"
@@ -253,6 +250,7 @@ function Connection({ assistant, onClose, onUse, onBusy }) {
                       retainedKey ? 'Keep current key' : provider === 'custom' ? 'Optional' : 'Paste your API key'
                     }
                     secureTextEntry
+                    autoComplete="off"
                     autoCapitalize="none"
                     autoCorrect={false}
                     maxLength={512}
@@ -261,7 +259,7 @@ function Connection({ assistant, onClose, onUse, onBusy }) {
                 ) : (
                   provider !== 'custom' && (
                     <Text style={s.subtitle}>
-                      Enter your API key in the Android app, desktop preview, or an HTTPS page.
+                      Open this prototype on localhost or HTTPS to enter an API key.
                     </Text>
                   )
                 ))}
@@ -292,7 +290,7 @@ function Connection({ assistant, onClose, onUse, onBusy }) {
               )}
             </>
           )}
-          {assistant.connected && (!savedAccount || replaceKey) && (
+          {assistant.connected && (!currentAccount || replaceKey) && (
             <Text style={s.subtitle}>Changing the provider or key clears this conversation.</Text>
           )}
           {!!error && (
@@ -310,7 +308,6 @@ function Connection({ assistant, onClose, onUse, onBusy }) {
                 disabled={
                   saving ||
                   assistant.replying ||
-                  assistant.connectionStatus === 'loading' ||
                   (provider === 'butler'
                     ? !value.trim()
                     : (customModel && !model.trim()) ||
@@ -353,9 +350,9 @@ function Connection({ assistant, onClose, onUse, onBusy }) {
                 }}
               />
             )}
-            {(assistant.connected || assistant.connectionStatus === 'error') && (
+            {assistant.connected && (
               <Button
-                label={assistant.connected ? 'Disconnect' : 'Clear saved connection'}
+                label="Disconnect"
                 danger
                 disabled={saving || assistant.replying}
                 onPress={() => void save(() => assistant.saveConnection(''))}
@@ -369,9 +366,8 @@ function Connection({ assistant, onClose, onUse, onBusy }) {
 }
 
 function PluginSettings({ assistant, onBack }) {
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const { plugins, pluginsReady, updatePlugins } = assistant;
+  const { plugins, updatePlugins } = assistant;
   const connection = assistant.model ? 'model' : assistant.endpoint ? 'server' : 'none';
   const imageMode = assistant.model?.mode === 'image';
   const options = [
@@ -379,11 +375,8 @@ function PluginSettings({ assistant, onBack }) {
     { id: 'imageMotion', label: 'Four-point reveal', hint: 'Animate the four corners when a reply image loads.' },
   ];
 
-  async function change(id, value) {
-    setSaving(true);
-    const error = await updatePlugins({ ...plugins, [id]: value });
-    setError(error ?? '');
-    setSaving(false);
+  function change(id, value) {
+    setError(updatePlugins({ ...plugins, [id]: value }) ?? '');
   }
 
   return (
@@ -407,7 +400,6 @@ function PluginSettings({ assistant, onBack }) {
         </Text>
         {workspaceTools.map((tool) => {
           const available =
-            assistant.workspaceReady &&
             !imageMode &&
             supportsWorkspaceTool(connection, tool.name) &&
             (tool.name !== 'customize_dashboard' || Platform.OS === 'web');
@@ -424,9 +416,9 @@ function PluginSettings({ assistant, onBack }) {
               <Switch
                 accessibilityLabel={tool.label}
                 value={available && plugins[tool.name]}
-                disabled={!available || !pluginsReady || saving || assistant.replying}
+                disabled={!available || assistant.replying}
                 trackColor={{ false: colors.border, true: colors.accent }}
-                onValueChange={(value) => void change(tool.name, value)}
+                onValueChange={(value) => change(tool.name, value)}
               />
             </View>
           );
@@ -443,9 +435,9 @@ function PluginSettings({ assistant, onBack }) {
             <Switch
               accessibilityLabel={label}
               value={plugins[id]}
-              disabled={!pluginsReady || saving || (id === 'imageMotion' && !plugins.images)}
+              disabled={id === 'imageMotion' && !plugins.images}
               trackColor={{ false: colors.border, true: colors.accent }}
-              onValueChange={(value) => void change(id, value)}
+              onValueChange={(value) => change(id, value)}
             />
           </View>
         ))}
@@ -460,7 +452,7 @@ function PluginSettings({ assistant, onBack }) {
 }
 
 function AgentIcons({ onBack, desktop }) {
-  const { shape, choose, warning } = useAgentMark();
+  const { shape, choose } = useAgentMark();
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
       <PageTitle
@@ -481,28 +473,12 @@ function AgentIcons({ onBack, desktop }) {
         current={shape}
         onChange={choose}
       />
-      {!!warning && (
-        <Text accessibilityRole="alert" style={s.subtitle}>
-          {warning}
-        </Text>
-      )}
     </ScrollView>
   );
 }
 
 function SettingsPanel({ page, assistant, setPage, backToSettings, onBusy, desktop }) {
   if (page === 'models') {
-    if (assistant.connectionStatus === 'loading') {
-      return (
-        <View style={[s.screen, s.content]}>
-          <PageTitle
-            title="Models"
-            action={<IconButton label="Back to settings" icon="chevron-back" onPress={backToSettings} />}
-          />
-          <ActivityIndicator accessibilityLabel="Loading saved connection" color={colors.accent} />
-        </View>
-      );
-    }
     return (
       <Connection
         assistant={assistant}
@@ -544,13 +520,13 @@ export function AssistantScreen({ assistant, keyboardOpen, desktop = false, sear
   }, [desktop, busy, searchMessageId]);
 
   useEffect(() => {
-    if (!page || (page === 'models' && assistant.connectionStatus !== 'loading')) return;
+    if (!page || page === 'models') return;
     const back = BackHandler.addEventListener('hardwareBackPress', () => {
       setPage(page === 'settings' ? undefined : 'settings');
       return true;
     });
     return () => back.remove();
-  }, [assistant.connectionStatus, page]);
+  }, [page]);
 
   function openPage(next) {
     setSearchMessage(undefined);

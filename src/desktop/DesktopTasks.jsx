@@ -19,7 +19,7 @@ const views = [
   { id: 'done', label: 'Completed', title: 'Completed tasks', icon: 'checkmark-circle-outline' },
 ];
 
-function DesktopTaskRow({ task, today, saving, onOpen, onToggle, onDrawn, selected, phase }) {
+function DesktopTaskRow({ task, today, onOpen, onToggle, onDrawn, selected, phase }) {
   const done = task.status === 'done';
   const settled = done && (!phase || phase === 'settled');
   const overdue = !done && !!task.dueDate && task.dueDate < today;
@@ -28,7 +28,7 @@ function DesktopTaskRow({ task, today, saving, onOpen, onToggle, onDrawn, select
     : 'Unscheduled';
   return (
     <div className="desktop-task-row" data-selected={selected} data-done={settled} data-phase={phase}>
-      <DesktopTaskCheck task={task} saving={saving} onToggle={onToggle} onDrawn={onDrawn} />
+      <DesktopTaskCheck task={task} onToggle={onToggle} onDrawn={onDrawn} />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Edit ${task.taskName}`}

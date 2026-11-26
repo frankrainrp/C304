@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDashboardTool } from '../src/dashboard/dashboardTool.js';
-import { changeDashboard, decodeDashboard } from '../src/dashboard/layout.js';
+import { changeDashboard, createDefaultDashboard } from '../src/dashboard/layout.js';
 
 test('a retried chat turn reuses in-flight or committed card mutations and later turns can intentionally repeat them', async () => {
-  let layout = decodeDashboard(undefined);
+  let layout = createDefaultDashboard();
   let count = 0;
   const initial = layout.modules.length;
   const tool = createDashboardTool({ getDashboardLayout: async () => layout, applyDashboardAction: async action => {

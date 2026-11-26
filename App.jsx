@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   AppState,
   BackHandler,
@@ -32,7 +31,7 @@ import { DesktopDashboard } from './src/dashboard/DesktopDashboard.jsx';
 import { desktopTabKeyboard } from './src/desktop/tabKeyboard.js';
 import { EditorSurface } from './src/desktop/EditorSurface.jsx';
 
-import { Button, Empty, SourceButton, colors, s } from './src/ui.jsx';
+import { SourceButton, colors, s } from './src/ui.jsx';
 import { useScreenTransition } from './src/useScreenTransition.js';
 import { useKeyboardLayout } from './src/useKeyboardLayout.js';
 import { useWorkspace } from './src/useWorkspace.js';
@@ -121,7 +120,7 @@ function TabBar({ current, onPick, desktop = false, disabled = false }) {
 }
 
 function StudyPlanner() {
-  const { workspace, saving, saveError, clearSaveError, loadError, retry, commit } = useWorkspace();
+  const { workspace, saveError, clearSaveError, commit } = useWorkspace();
   const motion = useScreenTransition();
   const keyboard = useKeyboardLayout();
   const assistant = useAssistant(workspace);
@@ -171,7 +170,7 @@ function StudyPlanner() {
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (motion.visible || saving) return true;
+      if (motion.visible) return true;
       if (editor) {
         clearSaveError();
         motion.transition(() => setEditor(null), true);
@@ -188,7 +187,7 @@ function StudyPlanner() {
       return false;
     });
     return () => subscription.remove();
-  }, [editor, motion, saving, showSummary, tab, clearSaveError]);
+  }, [editor, motion, showSummary, tab, clearSaveError]);
 
   function pickDate(date) {
     if (desktop && date !== selected) dismissDesktopTaskEffects();
@@ -197,7 +196,6 @@ function StudyPlanner() {
   }
 
   function open(route) {
-    if (saving) return;
     if (desktop) dismissDesktopTaskEffects();
     clearSaveError();
     motion.transition(() => {
@@ -210,7 +208,6 @@ function StudyPlanner() {
   }
 
   function close() {
-    if (saving) return;
     Keyboard.dismiss();
     clearSaveError();
     motion.transition(() => setEditor(null), true);
@@ -225,15 +222,15 @@ function StudyPlanner() {
     }, true);
   }
 
-  async function save(change, onSaved) {
+  function save(change, onSaved) {
     if (finishingEditor.current) return;
-    if (await commit(change)) finishSave(onSaved);
+    if (commit(change)) finishSave(onSaved);
   }
 
-  async function reviseTask(request) {
+  function reviseTask(request) {
     if (finishingEditor.current) return;
     let conflict;
-    const written = await commit((data) => {
+    const written = commit((data) => {
       const result = reviseTasks(data.tasks, request);
       conflict = result.conflict;
       return result.tasks === data.tasks ? data : { ...data, tasks: result.tasks };
@@ -244,7 +241,7 @@ function StudyPlanner() {
 
   function saveTask(task, announce) {
     if (announce) prepareTaskSound();
-    void save(
+    save(
       (data) => ({ ...data, tasks: upsert(data.tasks, task) }),
       announce
         ? () => {
@@ -262,7 +259,7 @@ function StudyPlanner() {
   function deleteRecord() {
     if (!editor) return;
     const id = editor.item.id;
-    void save((data) => {
+    save((data) => {
       switch (editor.kind) {
         case 'task':
           return { ...data, tasks: data.tasks.filter((task) => task.id !== id) };
@@ -273,12 +270,11 @@ function StudyPlanner() {
   }
 
   const taskActions = {
-    saving,
     onOpen: (task) => open({ kind: 'task', existing: true, item: task }),
-    onToggle: async (task) => {
+    onToggle: (task) => {
       let changed = false;
       const wasDone = task.status === 'done';
-      const success = await commit((data) => {
+      const success = commit((data) => {
         const stored = data.tasks.find((item) => item.id === task.id);
         if (!stored || (stored.status === 'done') !== wasDone) return data;
         changed = true;
@@ -320,7 +316,7 @@ function StudyPlanner() {
   }
 
   function openSearchResult(route) {
-    if (saving || editor) return;
+    if (editor) return;
     dismissDesktopTaskEffects();
     clearSaveError();
     motion.transition(() => {
@@ -342,7 +338,7 @@ function StudyPlanner() {
   }
 
   function openChatMessage(id) {
-    if (saving || editor) return;
+    if (editor) return;
     dismissDesktopTaskEffects();
     motion.transition(() => {
       setTab('assistant');
@@ -352,14 +348,14 @@ function StudyPlanner() {
   }
 
   function moveTask(task, dueDate, dueTime) {
-    void commit((data) => ({
+    commit((data) => ({
       ...data,
       tasks: data.tasks.map((item) => (item.id === task.id ? { ...item, dueDate, dueTime } : item)),
     }));
   }
 
   function editorContent(route) {
-    const actions = { saving, saveError, onClose: close, onDelete: deleteRecord };
+    const actions = { saveError, onClose: close, onDelete: deleteRecord };
     if (route.kind === 'task') {
       return (
         <TaskEditor
@@ -377,28 +373,12 @@ function StudyPlanner() {
         key={route.item.id}
         route={route}
         {...actions}
-        onSave={(item) => void save((data) => ({ ...data, notes: upsert(data.notes, item) }))}
+        onSave={(item) => save((data) => ({ ...data, notes: upsert(data.notes, item) }))}
       />
     );
   }
 
   function content() {
-    if (!workspace) {
-      return (
-        <View style={[s.content, styles.loading]}>
-          {loadError ? (
-            <Empty
-              icon="alert-circle-outline"
-              title="Study data couldn’t be opened"
-              hint="Your saved data hasn’t been changed."
-              action={<Button label="Try again" onPress={retry} />}
-            />
-          ) : (
-            <ActivityIndicator accessibilityLabel="Loading study data" color={colors.accent} size="large" />
-          )}
-        </View>
-      );
-    }
     if (!desktop && showSummary) {
       return (
         <TaskSummary tasks={workspace.tasks} onBack={() => motion.transition(() => setShowSummary(false), true)} />
@@ -454,7 +434,7 @@ function StudyPlanner() {
             onPick={pickDate}
             onMonth={pickDate}
             onAdd={newTask}
-            onMove={saving ? undefined : moveTask}
+            onMove={moveTask}
             {...taskActions}
           />
         );
@@ -485,18 +465,16 @@ function StudyPlanner() {
         {desktop && (
           <View role="banner" style={styles.desktopHeader}>
             <DesktopBrand />
-            {!!workspace && <TabBar current={tab} onPick={pickTab} desktop disabled={!!editor || saving} />}
-            {!!workspace && (
-              <DesktopSearch
-                tasks={workspace.tasks}
-                notes={workspace.notes}
-                messages={assistant.messages}
-                disabled={!!editor || saving}
-                onChatMessage={openChatMessage}
-                onTask={(item) => openSearchResult({ kind: 'task', existing: true, item })}
-                onNote={(item) => openSearchResult({ kind: 'note', existing: true, item })}
-              />
-            )}
+            <TabBar current={tab} onPick={pickTab} desktop disabled={!!editor} />
+            <DesktopSearch
+              tasks={workspace.tasks}
+              notes={workspace.notes}
+              messages={assistant.messages}
+              disabled={!!editor}
+              onChatMessage={openChatMessage}
+              onTask={(item) => openSearchResult({ kind: 'task', existing: true, item })}
+              onNote={(item) => openSearchResult({ kind: 'note', existing: true, item })}
+            />
           </View>
         )}
         {(!editor || desktop) && (
@@ -516,14 +494,13 @@ function StudyPlanner() {
                 )}
               </div>
             )}
-            {!desktop && !keyboard.open && !editor && workspace && <TabBar current={tab} onPick={pickTab} />}
+            {!desktop && !keyboard.open && !editor && <TabBar current={tab} onPick={pickTab} />}
           </View>
         )}
         {editor && (
           <EditorSurface
             desktop={desktop}
             label={`${editor.existing ? 'Edit' : 'New'} ${editor.kind}`}
-            saving={saving}
             fromSearch={editorFromSearch}
             onCancel={close}
           >
@@ -584,7 +561,6 @@ const styles = StyleSheet.create({
   railDashboardTab: { width: 132 },
   railTabContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   railTabLabel: { fontSize: 13, lineHeight: 17, textAlign: 'left' },
-  loading: { flex: 1, justifyContent: 'center' },
   banner: { marginHorizontal: 20, marginTop: 8 },
   tabs: { flexDirection: 'row', paddingHorizontal: 3, gap: 2 },
   tab: { flex: 1, minWidth: 0, height: 64, alignItems: 'center', justifyContent: 'center' },

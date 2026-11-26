@@ -16,7 +16,7 @@ import { useTaskCompletion } from './desktop/useTaskCompletion.js';
 import { Progress } from './bito/Progress.jsx';
 import { Button, Choices, DetroitContainer, Empty, Icon, PageTitle, colors, s } from './ui.jsx';
 
-function TaskRow({ task, saving, onOpen, onToggle, onDark = false, control, settled }) {
+function TaskRow({ task, onOpen, onToggle, onDark = false, control, settled }) {
   const done = task.status === 'done';
   const secondaryText = onDark ? styles.lightText : undefined;
   const schedule = task.dueDate
@@ -30,8 +30,6 @@ function TaskRow({ task, saving, onOpen, onToggle, onDark = false, control, sett
           accessibilityRole="checkbox"
           accessibilityLabel={`Mark ${task.taskName} as ${done ? 'to do' : 'done'}`}
           aria-checked={done}
-          aria-disabled={saving}
-          disabled={saving}
           onPress={() => onToggle(task)}
           style={({ pressed }) => [styles.checkboxTarget, pressed && s.dim]}
         >
@@ -82,7 +80,6 @@ function DesktopAgendaTask({ task, ...actions }) {
         control={
           <DesktopTaskCheck
             task={task}
-            saving={actions.saving}
             onToggle={completion.toggle}
             onDrawn={completion.drawn}
           />

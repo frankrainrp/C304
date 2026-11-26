@@ -35,7 +35,7 @@ export const dashboardCatalog = [
   { type: 'heatmap', label: 'Deadline heatmap', description: 'Seven weeks of daily deadline counts.' },
 ];
 
-export const defaultDashboard = {
+const defaultDashboard = {
   version: 1,
   modules: [
     { id: 'active-count', type: 'stat', title: 'Active tasks', span: 1, config: { metric: 'tasks-active' } },
@@ -124,28 +124,11 @@ function indexValue(index, maximum) {
   return index;
 }
 
-export function decodeDashboard(value) {
-  if (value === undefined)
-    return { version: 1, modules: defaultDashboard.modules.map((m) => ({ ...m, config: { ...m.config } })) };
-  const record = fields(value, ['version', 'modules'], 'saved dashboard');
-  if (record.version !== 1 || !Array.isArray(record.modules) || record.modules.length > 50)
-    throw new Error('The saved dashboard layout could not be read.');
-  const ids = new Set();
-  const modules = record.modules.map((entry) => {
-    const m = fields(entry, ['id', 'type', 'title', 'span', 'config'], 'saved module');
-    if (typeof m.id !== 'string' || !m.id || m.id.length > 100 || ids.has(m.id))
-      throw new Error('Invalid saved module identifier.');
-    ids.add(m.id);
-    const { type } = moduleDefinition(m.type);
-    return {
-      id: m.id,
-      type,
-      title: titleValue(m.title),
-      span: spanValue(m.span),
-      config: validatedConfig(type, m.config),
-    };
-  });
-  return { version: 1, modules };
+export function createDefaultDashboard() {
+  return {
+    version: 1,
+    modules: defaultDashboard.modules.map((module) => ({ ...module, config: { ...module.config } })),
+  };
 }
 
 export function changeDashboard(current, raw, newId) {

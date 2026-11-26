@@ -107,7 +107,7 @@ function InputPod({ assistant, onSend, onStop, onModels, compact, desktop, focus
                   : 'Choose model'
             }
             onPress={onModels}
-            disabled={assistant.replying || assistant.connectionStatus === 'loading'}
+            disabled={assistant.replying}
           />
         )}
         <ReplyControl
@@ -321,9 +321,6 @@ export function AssistantChat({ assistant, onSettings, onModels, keyboardOpen, d
         desktop={desktop}
         focusRequest={focusRequest}
       />
-      {assistant.connectionStatus === 'error' && (
-        <Text style={styles.disclaimer}>Open Settings to restore your model connection.</Text>
-      )}
     </View>
   );
 
@@ -415,11 +412,7 @@ export function AssistantChat({ assistant, onSettings, onModels, keyboardOpen, d
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.desktopHero}>
-            {assistant.connectionStatus === 'loading' ? (
-              <AgentOrb state="connecting" label="Loading connection" size={152} animate />
-            ) : (
-              <WelcomeOrb size={128} />
-            )}
+            <WelcomeOrb size={128} />
           </View>
           {composer}
         </ScrollView>
@@ -433,8 +426,8 @@ export function AssistantChat({ assistant, onSettings, onModels, keyboardOpen, d
             <View>
               <View style={styles.welcomeOrb}>
                 <AgentOrb
-                  state={assistant.connectionStatus === 'loading' ? 'connecting' : 'breathing'}
-                  label={assistant.connectionStatus === 'loading' ? 'Loading connection' : 'Agent idle'}
+                  state="breathing"
+                  label="Agent idle"
                   size={keyboardOpen ? 46 : 76}
                   animate
                 />
@@ -530,7 +523,6 @@ const styles = StyleSheet.create({
   actionText: { fontSize: 13, fontWeight: '700', color: colors.accent },
   replyControl: { width: 68, height: 64, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   quiet: { opacity: 0.52 },
-  disclaimer: { textAlign: 'center', fontSize: 11, lineHeight: 15, color: colors.muted },
   dock: { paddingTop: 8, paddingHorizontal: 10, paddingBottom: 10, gap: 6, zIndex: 2 },
   compactDock: { paddingTop: 5, paddingBottom: 5 },
   messages: { paddingTop: 14, paddingHorizontal: 15, paddingBottom: 10, gap: 16 },

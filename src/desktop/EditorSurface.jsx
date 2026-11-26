@@ -15,7 +15,7 @@ function returnTarget(previous) {
   return name ? document.querySelector(`[aria-label="${CSS.escape(name)}"]`) : null;
 }
 
-export function EditorSurface({ children, desktop, label, saving, fromSearch, onCancel }) {
+export function EditorSurface({ children, desktop, label, fromSearch, onCancel }) {
   const container = useRef(null);
   const backdropPress = useRef(false);
   const trigger = useRef(null);
@@ -86,13 +86,13 @@ export function EditorSurface({ children, desktop, label, saving, fromSearch, on
       onKeyDown={cycleFocus}
       onCancel={(event) => {
         event.preventDefault();
-        if (!saving && desktop) onCancel();
+        if (desktop) onCancel();
       }}
       onPointerDown={(event) => {
         backdropPress.current = desktop && isBackdrop(event);
       }}
       onClick={(event) => {
-        if (backdropPress.current && !saving && isBackdrop(event)) onCancel();
+        if (backdropPress.current && isBackdrop(event)) onCancel();
       }}
     >
       {children}

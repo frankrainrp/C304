@@ -1,19 +1,19 @@
 import './taskFeedback.css';
-import { browserPreference } from './browserPreference.js';
+import { createMemoryPreference } from '../browser/memoryPreference.js';
 
-const sound = browserPreference('bito-c304.desktop-task-sounds', ['on', 'off'], 'on');
+const sound = createMemoryPreference(true);
 let audio;
 
 export function taskSoundsEnabled() {
-  return sound.get() === 'on';
+  return sound.get();
 }
 
 export const subscribeTaskSounds = sound.subscribe;
 export function setTaskSoundsEnabled(value) {
-  sound.set(value ? 'on' : 'off');
+  sound.set(value);
 }
 
-// Request audio during activation. Emit a note only after persistence succeeds.
+// Request audio during activation. Emit a note after the task change succeeds.
 export function prepareTaskSound() {
   if (!taskSoundsEnabled() || typeof AudioContext !== 'function') return;
   try {

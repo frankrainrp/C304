@@ -30,10 +30,7 @@ export function VaultImport({ commit, reserved }) {
         report = summary;
         return added.length ? { ...data, notes: [...data.notes, ...added] } : data;
       });
-      if (!ok || !report)
-        throw new Error(
-          'Could not save this batch. No notes were imported. Check available browser storage and retry.'
-        );
+      if (!ok || !report) throw new Error('Could not add these notes. Check the selection and try again.');
       setSummary(report);
     } catch (reason) {
       setError(

@@ -1,16 +1,13 @@
-export function DesktopTaskCheck({ task, saving, onToggle, onDrawn }) {
+export function DesktopTaskCheck({ task, onToggle, onDrawn }) {
   const done = task.status === 'done';
   return (
     <button
       type="button"
       role="checkbox"
       aria-checked={done}
-      aria-disabled={saving}
       data-task-toggle={task.id}
       aria-label={`Mark ${task.taskName} as ${done ? 'to do' : 'done'}`}
-      onClick={() => {
-        if (!saving) onToggle(task);
-      }}
+      onClick={() => onToggle(task)}
       className="desktop-task-toggle"
     >
       <span className="desktop-task-check">

@@ -17,7 +17,7 @@ npm start
 
 Open the local address printed by Vite. Use `npm test` for the regression suite, `npm run build` for a production build and `npm run preview` to serve that build locally.
 
-The browser entry uses React DOM. Application files use JavaScript and JSX. Selected shared controls use React Native Web for their browser presentation. The project uses Vite and ordinary browser storage. Tasks, Calendar, Notes and Dashboard work without an account or a model key.
+The browser entry uses React DOM. Application files use JavaScript and JSX. Selected shared controls use React Native Web for their browser presentation. Vite runs and builds the prototype. Tasks, Calendar, Notes and Dashboard work without an account or a model key.
 
 ## Pages and navigation
 
@@ -26,7 +26,7 @@ The browser entry uses React DOM. Application files use JavaScript and JSX. Sele
 | Tasks | Create a task with a title, due date, time and priority. Change its status or edit its details. | Validation keeps an incomplete form open. Saved changes update the list and the completion summary. |
 | Calendar | Choose a day and add a study session. On desktop, switch between month, week and day views. | The session uses the selected date and also appears in Tasks. Selecting an existing entry opens its task editor. |
 | Notes | Create a revision note, edit Markdown or open a link between notes. | The desktop file tree, reading view and backlinks use the saved notes. Markdown files can be imported and exported. |
-| Dashboard | Use **Customize** to add, edit, move or remove a card. | Statistics, countdowns, task lists, pie charts, bar charts and heatmaps use the current workspace. Card settings survive a reload. |
+| Dashboard | Use **Customize** to add, edit, move or remove a card. | Statistics, countdowns, task lists, pie charts, bar charts and heatmaps update with the current workspace. |
 | Agent | Open Settings to select a provider and model, then ask a question. | An optional provider connection enables chat and supported image models. A model with tool calling can arrange dashboard cards. Reading task, calendar or note content requires the corresponding plugin. |
 
 For a walkthrough, open **Calendar**, add a study session, then find it in **Tasks** and mark it complete. Open **Dashboard** and add a Statistic card using **Completed tasks**. Its value comes from the same task list. On desktop the five views share the top navigation and search. On narrow screens they share the bottom navigation.
@@ -49,11 +49,11 @@ App
     └── EditorSurface → TaskEditor or TextEditor
 ```
 
-`StudyPlanner` passes the shared records and update callbacks to each view through props. `TaskEditor` holds its form draft in React state and validates it before saving. Lists render arrays of task or note objects. Conditional rendering handles empty lists, validation messages, storage errors and desktop or narrow layouts.
+`StudyPlanner` passes the shared records and update callbacks to each view through props. `TaskEditor` holds its form draft in React state and validates it before applying the change. Lists render arrays of task or note objects. Conditional rendering handles empty lists, validation messages and desktop or narrow layouts.
 
 ## Data and CA2 design
 
-On first use the app seeds six fictional study tasks and three linked notes. Dates are relative to the first launch, so the sample includes a missed deadline, work due today and work planned for next week. Refreshing opens the saved records, including an intentionally empty workspace. Tasks and notes persist on the current browser origin. Dashboard layout uses IndexedDB. Chat history stays in memory.
+Each page load starts with six fictional study tasks and three linked notes. Dates are relative to the current day, so the sample includes a missed deadline, work due today and work planned for next week. Tasks, notes, drafts, dashboard layout, model settings and interface preferences live in memory for the current visit. Switching views keeps those changes. Refreshing resets the workspace to its sample data and settings to their defaults. Use **Export Markdown** to download a copy of notes.
 
 | Planned entity | Fields and relationships |
 | --- | --- |
@@ -62,7 +62,7 @@ On first use the app seeds six fictional study tasks and three linked notes. Dat
 | Note | ID, workspace ID, title or vault path, Markdown content and update time. Note links and backlinks are derived from the content. |
 | Dashboard card | ID, workspace ID, component type, title, width, order and validated card settings. Cards reference a metric or filter rather than copying a task list. |
 
-The following endpoints are proposed for the Node.js backend in CA2. CA1 reads and updates the local browser workspace.
+The following endpoints are proposed for the Node.js backend in CA2. CA1 reads and updates the in-memory workspace.
 
 | Method | Path | Purpose | Expected input and output |
 | --- | --- | --- | --- |

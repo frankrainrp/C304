@@ -5,7 +5,7 @@ import { dateKey, priorities, statuses, taskError } from './model.js';
 import { Button, Choices, Field, PageTitle, s } from './ui.jsx';
 import { taskFieldNames, withSavedFields } from './desktop/taskEdits.js';
 
-function EditorLayout({ route, saving, saveError, onClose, onDelete, onSubmit, error, resolution, children }) {
+function EditorLayout({ route, saveError, onClose, onDelete, onSubmit, error, resolution, children }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const resolving = !!resolution;
   useEffect(() => {
@@ -17,7 +17,7 @@ function EditorLayout({ route, saving, saveError, onClose, onDelete, onSubmit, e
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
         <PageTitle
           title={`${route.existing ? 'Edit' : 'New'} ${route.kind}`}
-          action={<Button label="Cancel" secondary disabled={saving} onPress={onClose} />}
+          action={<Button label="Cancel" secondary onPress={onClose} />}
         />
         <View style={styles.form}>{children}</View>
         <View style={styles.actions}>
@@ -36,15 +36,15 @@ function EditorLayout({ route, saving, saveError, onClose, onDelete, onSubmit, e
               <>
                 <Text style={s.label}>Delete this {route.kind}?</Text>
                 <View style={[s.row, s.wrap]}>
-                  <Button label={`Delete ${route.kind}`} danger disabled={saving} onPress={onDelete} />
-                  <Button label="Keep it" secondary disabled={saving} onPress={() => setConfirmDelete(false)} />
+                  <Button label={`Delete ${route.kind}`} danger onPress={onDelete} />
+                  <Button label="Keep it" secondary onPress={() => setConfirmDelete(false)} />
                 </View>
               </>
             ) : (
               <View style={[s.row, s.wrap]}>
-                <Button label={`Save ${route.kind}`} icon="checkmark" disabled={saving} onPress={onSubmit} />
+                <Button label={`Save ${route.kind}`} icon="checkmark" onPress={onSubmit} />
                 {route.existing && (
-                  <Button label="Delete…" danger disabled={saving} onPress={() => setConfirmDelete(true)} />
+                  <Button label="Delete…" danger onPress={() => setConfirmDelete(true)} />
                 )}
               </View>
             ))}
@@ -116,10 +116,10 @@ export function TaskEditor({ route, onSave, onRevise, onCopy, ...actions }) {
     <>
       <Text accessibilityRole="alert" style={s.error}>
         {conflict.kind === 'deleted'
-          ? 'This task was deleted in another tab. You can save your draft as a new task.'
+          ? 'This task was deleted while you were editing. You can save your draft as a new task.'
           : conflict.kind === 'deleteChanged'
-            ? 'This task changed in another tab. Review the changes before deleting it.'
-            : 'The same fields changed in another tab. Choose which values to save.'}
+            ? 'This task changed while you were editing. Review the changes before deleting it.'
+            : 'The same fields changed while you were editing. Choose which values to save.'}
       </Text>
       {conflict.kind !== 'deleted' &&
         conflict.fields.map((field) => {
@@ -139,20 +139,18 @@ export function TaskEditor({ route, onSave, onRevise, onCopy, ...actions }) {
         })}
       <View style={[s.row, s.wrap]}>
         {conflict.kind === 'deleted' && (
-          <Button label="Save as new task" disabled={actions.saving} onPress={() => submit(true)} />
+          <Button label="Save as new task" onPress={() => submit(true)} />
         )}
         {conflict.kind === 'deleteChanged' && (
           <>
             <Button
               label="Keep editing"
               secondary
-              disabled={actions.saving}
               onPress={() => setConflict(undefined)}
             />
             <Button
               label="Delete updated task"
               danger
-              disabled={actions.saving}
               onPress={() => void revise({ kind: 'delete', base: conflict.latest })}
             />
           </>
@@ -162,13 +160,12 @@ export function TaskEditor({ route, onSave, onRevise, onCopy, ...actions }) {
             <Button
               label="Use saved values"
               secondary
-              disabled={actions.saving}
               onPress={() => {
                 showDraft(withSavedFields(readDraft(), conflict.latest, conflict.fields));
                 setConflict(undefined);
               }}
             />
-            <Button label="Save my values" disabled={actions.saving} onPress={() => submit()} />
+            <Button label="Save my values" onPress={() => submit()} />
           </>
         )}
       </View>
@@ -189,7 +186,6 @@ export function TaskEditor({ route, onSave, onRevise, onCopy, ...actions }) {
         value={task.taskName}
         onChangeText={(value) => update('taskName', value)}
         maxLength={100}
-        editable={!actions.saving}
       />
       <Field
         label="Description"
@@ -198,7 +194,6 @@ export function TaskEditor({ route, onSave, onRevise, onCopy, ...actions }) {
         onChangeText={(value) => update('description', value)}
         multiline
         maxLength={3000}
-        editable={!actions.saving}
       />
       <View style={[s.row, styles.dateFields]}>
         <View style={s.grow}>
@@ -208,7 +203,6 @@ export function TaskEditor({ route, onSave, onRevise, onCopy, ...actions }) {
             value={task.dueDate}
             maxLength={10}
             onChangeText={(value) => update('dueDate', value)}
-            editable={!actions.saving}
           />
         </View>
         <View style={s.grow}>
@@ -218,7 +212,6 @@ export function TaskEditor({ route, onSave, onRevise, onCopy, ...actions }) {
             value={task.dueTime}
             maxLength={5}
             onChangeText={(value) => update('dueTime', value)}
-            editable={!actions.saving}
           />
         </View>
       </View>
@@ -227,12 +220,10 @@ export function TaskEditor({ route, onSave, onRevise, onCopy, ...actions }) {
           label="Today"
           secondary
           onPress={() => update('dueDate', dateKey(new Date()))}
-          disabled={actions.saving}
         />
         <Button
           label="Clear schedule"
           secondary
-          disabled={actions.saving}
           onPress={() => {
             setTask((current) => ({ ...current, dueDate: '', dueTime: '' }));
             setError(undefined);
@@ -259,7 +250,6 @@ export function TaskEditor({ route, onSave, onRevise, onCopy, ...actions }) {
         value={tags}
         onChangeText={setTags}
         maxLength={180}
-        editable={!actions.saving}
       />
     </EditorLayout>
   );
@@ -286,7 +276,6 @@ export function TextEditor({ route, onSave, ...actions }) {
         value={title}
         placeholder="e.g. Database revision"
         maxLength={100}
-        editable={!actions.saving}
         onChangeText={(value) => {
           setTitle(value);
           setError(undefined);
@@ -298,7 +287,6 @@ export function TextEditor({ route, onSave, ...actions }) {
         onChangeText={setBody}
         multiline
         maxLength={12000}
-        editable={!actions.saving}
         placeholder="Write your study notes here"
       />
     </EditorLayout>

@@ -10,13 +10,7 @@ import {
   serverEndpoint,
   serverEndpointError,
 } from './assistant.js';
-import {
-  defaultPlugins,
-  loadAssistantConnection,
-  loadPlugins,
-  saveAssistantConnection,
-  savePlugins,
-} from './chat/assistantPreferences.js';
+import { defaultPlugins } from './chat/assistantPreferences.js';
 import { createLiveReplyText } from './chat/liveReplyText.js';
 import { markOrbReplyStarted } from './chat/OrbReplyReveal.jsx';
 import { createWorkspaceTools, toolsOff } from './chat/workspaceTools.js';
@@ -34,7 +28,7 @@ function sessionTitle(session) {
 }
 
 export function useAssistant(workspace) {
-  const [endpoint, setEndpoint] = useState('');
+  const [endpoint, setEndpoint] = useState(() => serverEndpoint(import.meta.env.VITE_BUTLER_CHAT_URL ?? '') ?? '');
   const [model, setModel] = useState();
   const [catalog, setCatalog] = useState([]);
   const [catalogStatus, setCatalogStatus] = useState('idle');
@@ -44,18 +38,16 @@ export function useAssistant(workspace) {
   const catalogueRequest = useRef(null);
   const allowsKeys = Platform.OS !== 'web' || globalThis.isSecureContext;
   const connected = Boolean(endpoint || model);
-  const [connectionStatus, setConnectionStatus] = useState('loading');
   const [verification, setVerification] = useState('unverified');
-  const [savedPlugins, setPlugins] = useState(defaultPlugins);
+  const [pluginSettings, setPlugins] = useState(defaultPlugins);
   const toolConnection = model ? JSON.stringify([model.provider, model.model, model.baseUrl]) : endpoint;
   const plugins = useMemo(
     () =>
-      savedPlugins.toolConnection === toolConnection
-        ? savedPlugins
-        : { ...savedPlugins, ...toolsOff, customize_dashboard: savedPlugins.customize_dashboard, toolConnection },
-    [savedPlugins, toolConnection]
+      pluginSettings.toolConnection === toolConnection
+        ? pluginSettings
+        : { ...pluginSettings, ...toolsOff, customize_dashboard: pluginSettings.customize_dashboard, toolConnection },
+    [pluginSettings, toolConnection]
   );
-  const [pluginsReady, setPluginsReady] = useState(false);
   const [draft, setDraft] = useState('');
   const [messages, setMessages] = useState([]);
   const [replying, setReplying] = useState(false);
@@ -68,34 +60,8 @@ export function useAssistant(workspace) {
   const pending = useRef(null);
   const connectionProbe = useRef(null);
   const changingConnection = useRef(false);
-  const changingPlugins = useRef(false);
-
-  useEffect(() => {
-    let active = true;
-    void loadAssistantConnection()
-      .then((value) => {
-        if (!active) return;
-        if (value.type === 'server') setEndpoint(value.endpoint);
-        if (value.type === 'model') {
-          setModel(value.profile);
-          setCatalogVerified(!!value.catalogVerified);
-          if (value.verified) setVerification('verified');
-        }
-        setConnectionStatus('ready');
-      })
-      .catch(() => {
-        if (active) setConnectionStatus('error');
-      });
-    void loadPlugins()
-      .then((value) => {
-        if (active) setPlugins(value);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setPluginsReady(true);
-      });
-    return () => {
-      active = false;
+  useEffect(
+    () => () => {
       pending.current?.abort();
       pending.current = null;
       liveText.clear();
@@ -103,8 +69,9 @@ export function useAssistant(workspace) {
       connectionProbe.current = null;
       catalogueRequest.current?.abort();
       catalogueRequest.current = null;
-    };
-  }, [liveText]);
+    },
+    [liveText]
+  );
 
   function resetConversation() {
     pending.current?.abort();
@@ -171,8 +138,8 @@ export function useAssistant(workspace) {
     }
   }
 
-  async function persistConnection(connection, discover = false, chooseUnknown) {
-    if (changingConnection.current || pending.current || connectionStatus === 'loading')
+  async function applyConnection(connection, discover = false, chooseUnknown) {
+    if (changingConnection.current || pending.current)
       return 'Wait for the current operation to finish.';
     changingConnection.current = true;
     if (catalogueRequest.current) setCatalogStatus(catalog.length ? 'ready' : 'idle');
@@ -220,7 +187,6 @@ export function useAssistant(workspace) {
           connectionProbe.current = null;
         }
       }
-      await saveAssistantConnection(connection);
       const sameAccount =
         connection.type === 'model' &&
         model?.provider === connection.profile.provider &&
@@ -243,10 +209,7 @@ export function useAssistant(workspace) {
       setCatalogVerified(connection.type === 'model' && !!connection.catalogVerified);
       setEndpoint(connection.type === 'server' ? connection.endpoint : '');
       setModel(connection.type === 'model' ? connection.profile : undefined);
-      setVerification(connection.type === 'model' && connection.verified ? 'verified' : 'unverified');
-      setConnectionStatus('ready');
-    } catch {
-      return 'Couldn’t save the connection on this device.';
+      setVerification('unverified');
     } finally {
       changingConnection.current = false;
     }
@@ -256,7 +219,7 @@ export function useAssistant(workspace) {
     const url = value === '' ? '' : serverEndpoint(value);
     if (url === undefined) return serverEndpointError(value);
     if (url && url === endpoint && !model) return;
-    return persistConnection(url ? { type: 'server', endpoint: url } : { type: 'none' });
+    return applyConnection(url ? { type: 'server', endpoint: url } : { type: 'none' });
   }
 
   async function saveModel(value, manual = false, chooseUnknown) {
@@ -280,7 +243,7 @@ export function useAssistant(workspace) {
     }
     const sameAccount =
       model?.provider === profile.provider && model.key === profile.key && model.baseUrl === profile.baseUrl;
-    return persistConnection(
+    return applyConnection(
       { type: 'model', profile, catalogVerified: sameAccount && catalogVerified ? true : undefined },
       !manual,
       chooseUnknown
@@ -298,32 +261,22 @@ export function useAssistant(workspace) {
     ) {
       return Promise.resolve('That model is unavailable for this mode.');
     }
-    return persistConnection({
+    return applyConnection({
       type: 'model',
       profile: { ...model, model: id, mode },
       catalogVerified: catalogVerified ? true : undefined,
     });
   }
 
-  async function updatePlugins(value) {
-    if (changingPlugins.current) return 'Wait for the current change to finish.';
+  function updatePlugins(value) {
     if (pending.current && Object.keys(toolsOff).some((key) => value[key] !== plugins[key])) {
       return 'Stop the reply before changing workspace access.';
     }
-    changingPlugins.current = true;
-    try {
-      const scoped = { ...value, toolConnection };
-      await savePlugins(scoped);
-      setPlugins(scoped);
-    } catch {
-      return 'Couldn’t save plugin settings on this device.';
-    } finally {
-      changingPlugins.current = false;
-    }
+    setPlugins({ ...value, toolConnection });
   }
 
   async function reply(turns) {
-    if (!connected || pending.current || changingConnection.current || changingPlugins.current) return;
+    if (!connected || pending.current || changingConnection.current) return;
     const controller = new AbortController();
     const id = randomUUID();
     const imageMode = model?.mode === 'image';
@@ -347,7 +300,7 @@ export function useAssistant(workspace) {
       const weekEnd = new Date(now);
       weekEnd.setDate(now.getDate() + 7);
       const available =
-        !imageMode && workspace && pluginsReady
+        !imageMode
           ? createWorkspaceTools(
               workspace,
               plugins,
@@ -434,7 +387,6 @@ export function useAssistant(workspace) {
       pending.current ||
       error ||
       changingConnection.current ||
-      changingPlugins.current ||
       messages.at(-1)?.role === 'user'
     )
       return;
@@ -460,16 +412,13 @@ export function useAssistant(workspace) {
     endpoint,
     connected,
     allowsKeys,
-    connectionStatus,
     verification,
     saveConnection,
     saveModel,
     draft,
     setDraft,
     plugins,
-    pluginsReady,
     updatePlugins,
-    workspaceReady: !!workspace,
     catalog,
     catalogStatus,
     catalogIssue,
